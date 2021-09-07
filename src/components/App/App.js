@@ -3,7 +3,7 @@ import styled from "styled-components";
 // import PropTypes fomr "prop-types";
 
 const API_ENDPOINT =
-  "https://student-json-api.lidemy.me/comments?_sort=createdAt&_order=desc&_limit=10";
+  "https://student-json-api.lidemy.me/comments?_sort=createdAt&_order=desc&_limit=3";
 
 //css styled elements
 const Page = styled.div`
@@ -16,6 +16,10 @@ const Title = styled.h1`
   color: #333;
 `;
 const MessageForm = styled.form``;
+const MessageNickname = styled.input`
+  margin-bottom: 2%;
+  width: 100%;
+`;
 const MessageTextArea = styled.textarea`
   display: block;
   width: 100%;
@@ -51,6 +55,19 @@ const MessageContent = styled.div`
   margin-top: 16px;
   font-size: 16px;
 `;
+const Loading = styled.div`
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  font-size: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
 
 function Message({ author, time, children }) {
   return (
@@ -78,26 +95,92 @@ const ErrorMessage = styled.div`
 
 function App() {
   const [messages, setMessages] = useState([]);
-  const [apiError, setApiError] = useState(null);
+  const [messageApiError, setMessageApiError] = useState(null);
+  const [value, setValue] = useState();
+  const [nickname, setNickname] = useState();
+  const [postMessageError, setPostMessageError] = useState(null);
+  const [isLoadingPostMessage, setIsLoadingPostMessage] = useState(false);
 
-  useEffect(() => {
-    fetch(API_ENDPOINT)
+  const fetchMessages = () => {
+    return fetch(API_ENDPOINT)
       .then((res) => res.json())
       .then((data) => {
         setMessages(data);
       })
-      .catch((err) => setApiError(err.message));
+      .catch((err) => setMessageApiError(err.message));
+  };
+
+  const handleTextAreaChange = (e) => {
+    setValue(e.target.value);
+  };
+  const handleNicknameChange = (e) => {
+    setNickname(e.target.value);
+  };
+  const handleFormFocus = () => {
+    setPostMessageError(null);
+  };
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+    if (isLoadingPostMessage) {
+      return;
+    }
+    setIsLoadingPostMessage(true);
+    fetch("https://student-json-api.lidemy.me/comments", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        nickname: nickname,
+        body: value,
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        setIsLoadingPostMessage(false);
+        if (data.ok === 0) {
+          setPostMessageError(data.message);
+          return;
+        }
+        setValue("");
+        setNickname("");
+        fetchMessages();
+      })
+      .catch((err) => {
+        setIsLoadingPostMessage(false);
+        setPostMessageError(err.message);
+      });
+  };
+
+  useEffect(() => {
+    fetchMessages();
   }, []);
 
   return (
     <Page>
+      {isLoadingPostMessage && <Loading>Loading...</Loading>}
       <Title>Message Board</Title>
-      <MessageForm>
-        <MessageTextArea rows={10} />
+      <MessageForm onSubmit={handleFormSubmit}>
+        <MessageNickname
+          nickname={nickname}
+          onChange={handleNicknameChange}
+          placeholder={"nickname"}
+          onFocus={handleFormFocus}
+        />
+        <MessageTextArea
+          value={value}
+          onChange={handleTextAreaChange}
+          onFocus={handleFormFocus}
+          rows={10}
+          placeholder={"comment"}
+        />
         <SubmitButton>send</SubmitButton>
+        {postMessageError && <ErrorMessage>{postMessageError}</ErrorMessage>}
       </MessageForm>
-      {apiError && (
-        <ErrorMessage>something went wrong. {apiError.toString()}</ErrorMessage>
+      {messageApiError && (
+        <ErrorMessage>
+          something went wrong. {messageApiError.toString()}
+        </ErrorMessage>
       )}
       <MessageList>
         {messages.map((message) => (
